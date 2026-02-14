@@ -3,7 +3,11 @@ import streamlit as st
 import plotly.graph_objects as go
 from io import StringIO
 <<<<<<< Updated upstream:Home.py
+<<<<<<< Updated upstream:Home.py
 from utils import parse_whatsapp_messages_with_years, get_available_years, create_wordcloud, aggregate_messages_by_time
+=======
+from utils import parse_whatsapp_messages_with_years, parse_whatsapp_messages_with_dates, get_available_years, create_wordcloud
+>>>>>>> Stashed changes:app.py
 =======
 from utils import parse_whatsapp_messages_with_years, parse_whatsapp_messages_with_dates, get_available_years, create_wordcloud
 >>>>>>> Stashed changes:app.py
@@ -58,7 +62,12 @@ if uploaded_file is not None:
         text_content = stringio.read()
 
 <<<<<<< Updated upstream:Home.py
+<<<<<<< Updated upstream:Home.py
         all_messages, messages_by_year, speakers, message_dates = parse_whatsapp_messages_with_years(text_content)
+=======
+        # Parse with dates for topic modeling
+        messages_with_dates, all_messages, messages_by_year, speakers = parse_whatsapp_messages_with_dates(text_content)
+>>>>>>> Stashed changes:app.py
 =======
         # Parse with dates for topic modeling
         messages_with_dates, all_messages, messages_by_year, speakers = parse_whatsapp_messages_with_dates(text_content)
