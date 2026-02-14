@@ -1,13 +1,13 @@
 """WhatsApp Conversation WordCloud - Home Page"""
 import streamlit as st
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 from io import StringIO
-from utils import parse_whatsapp_messages_with_years, get_available_years, create_wordcloud
+from utils import parse_whatsapp_messages_with_years, get_available_years, create_wordcloud, aggregate_messages_by_time
 
 # Page config
 st.set_page_config(
-    page_title="WhatsApp WordCloud",
-    page_icon="💬",
+    page_title="Home - WhatsApp WordCloud",
+    page_icon="🏠",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -21,6 +21,8 @@ if 'messages_by_year' not in st.session_state:
     st.session_state.messages_by_year = {}
 if 'speakers' not in st.session_state:
     st.session_state.speakers = {}
+if 'message_dates' not in st.session_state:
+    st.session_state.message_dates = []
 if 'language' not in st.session_state:
     st.session_state.language = "English"
 if 'selected_year' not in st.session_state:
@@ -49,7 +51,7 @@ if uploaded_file is not None:
         stringio = StringIO(uploaded_file.getvalue().decode("utf-8"))
         text_content = stringio.read()
 
-        all_messages, messages_by_year, speakers = parse_whatsapp_messages_with_years(text_content)
+        all_messages, messages_by_year, speakers, message_dates = parse_whatsapp_messages_with_years(text_content)
 
         if all_messages:
             # Store in session state
@@ -57,6 +59,7 @@ if uploaded_file is not None:
             st.session_state.all_messages = all_messages
             st.session_state.messages_by_year = messages_by_year
             st.session_state.speakers = speakers
+            st.session_state.message_dates = message_dates
 
             st.success(f"✅ Chat loaded successfully! Found {len(all_messages)} messages from {len(speakers)} speakers.")
         else:
@@ -87,96 +90,68 @@ if st.session_state.chat_uploaded:
         )
         st.session_state.selected_year = selected_year
 
-# Dashboard Overview (placeholder charts)
+# Dashboard Overview
 if st.session_state.chat_uploaded:
-    st.header("📊 Dashboard Overview")
+    st.header("📊 Message Activity Timeline")
 
-    # Timeline placeholder
-    st.subheader("Activity Timeline")
-    fig, ax = plt.subplots(figsize=(12, 3))
-    # Dummy data for timeline
-    months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-    activity = [45, 52, 38, 65, 70, 58, 62, 55, 48, 60, 68, 75]
-    ax.plot(months, activity, marker='o', linewidth=2, markersize=6, color='#1f77b4')
-    ax.fill_between(range(len(months)), activity, alpha=0.3, color='#1f77b4')
-    ax.set_xlabel('Month')
-    ax.set_ylabel('Messages')
-    ax.set_title('Message Activity Over Time (placeholder)')
-    ax.grid(True, alpha=0.3)
-    st.pyplot(fig)
-    plt.close()
+    # Generate timeline data
+    if st.session_state.message_dates:
+        dates, counts = aggregate_messages_by_time(st.session_state.message_dates)
 
-    st.divider()
+        # Determine aggregation type for display
+        sorted_dates = sorted(st.session_state.message_dates)
+        duration = (sorted_dates[-1] - sorted_dates[0]).days
+        aggregation_type = "Weekly" if duration < 365 else "Monthly"
 
-    # Preview cards section
-    st.header("🔍 Explore Insights")
+        # Create interactive Plotly chart
+        fig = go.Figure()
 
-    col1, col2, col3 = st.columns(3)
+        fig.add_trace(go.Scatter(
+            x=dates,
+            y=counts,
+            mode='lines',
+            fill='tozeroy',
+            line=dict(color='#667eea', width=2.5),
+            fillcolor='rgba(102, 126, 234, 0.2)',
+            hovertemplate='<b>%{x|%B %d, %Y}</b><br>Messages: %{y}<extra></extra>',
+            name='Messages'
+        ))
 
-    # Speakers preview card
-    with col1:
-        st.subheader("👥 Speakers")
-        if st.session_state.speakers:
-            # Show top 5 speakers
-            top_speakers = sorted(st.session_state.speakers.items(), key=lambda x: x[1], reverse=True)[:5]
-            speaker_names = [s[0] for s in top_speakers]
-            speaker_counts = [s[1] for s in top_speakers]
+        fig.update_layout(
+            title=dict(
+                text=f'{aggregation_type} Message Activity',
+                font=dict(size=20, color='#1f2937')
+            ),
+            xaxis=dict(
+                title='Time',
+                showgrid=True,
+                gridcolor='rgba(0,0,0,0.05)',
+                zeroline=False
+            ),
+            yaxis=dict(
+                title='Number of Messages',
+                showgrid=True,
+                gridcolor='rgba(0,0,0,0.05)',
+                zeroline=False
+            ),
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            hovermode='x unified',
+            height=400,
+            margin=dict(l=60, r=40, t=80, b=60)
+        )
 
-            fig, ax = plt.subplots(figsize=(5, 3))
-            ax.barh(speaker_names, speaker_counts, color='#ff7f0e')
-            ax.set_xlabel('Messages')
-            ax.set_title('Top 5 Speakers')
-            plt.tight_layout()
-            st.pyplot(fig)
-            plt.close()
-        else:
-            st.info("📊 Speaker activity chart will appear here")
+        st.plotly_chart(fig, use_container_width=True)
 
-        if st.button("View Details →", key="speakers_btn", use_container_width=True):
-            st.switch_page("pages/1_Speakers.py")
-
-    # Words preview card
-    with col2:
-        st.subheader("📝 Words")
-
-        # Generate quick wordcloud preview
-        if st.session_state.selected_year == "All":
-            messages_text = ' '.join(st.session_state.all_messages)
-        else:
-            year_int = int(st.session_state.selected_year)
-            messages_text = ' '.join(st.session_state.messages_by_year[year_int])
-
-        if messages_text.strip():
-            wordcloud = create_wordcloud(messages_text, st.session_state.language)
-            st.session_state.wordcloud_image = wordcloud
-
-            fig, ax = plt.subplots(figsize=(5, 3))
-            ax.imshow(wordcloud, interpolation='bilinear')
-            ax.axis('off')
-            ax.set_title('WordCloud Preview')
-            st.pyplot(fig)
-            plt.close()
-        else:
-            st.info("☁️ Word cloud will appear here")
-
-        if st.button("View Full Cloud →", key="words_btn", use_container_width=True):
-            st.switch_page("pages/2_Words.py")
-
-    # Themes preview card
-    with col3:
-        st.subheader("🏷️ Themes")
-
-        # Placeholder topics
-        topics = ["Topic 1: Social", "Topic 2: Work", "Topic 3: Family", "Topic 4: Events"]
-
-        st.markdown("**Discovered Topics:**")
-        for topic in topics:
-            st.markdown(f"• {topic}")
-
-        st.caption("_Topic modeling coming soon_")
-
-        if st.button("Explore Themes →", key="themes_btn", use_container_width=True):
-            st.switch_page("pages/3_Themes.py")
+        # Show stats
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total Messages", f"{len(st.session_state.all_messages):,}")
+        with col2:
+            st.metric("Peak Activity", f"{max(counts)} messages")
+        with col3:
+            avg_messages = sum(counts) / len(counts) if counts else 0
+            st.metric("Average", f"{avg_messages:.1f} messages/{aggregation_type.lower()[:-2]}")
 
 else:
     # Show help when no file is uploaded
