@@ -6,7 +6,9 @@ from wordcloud import WordCloud, STOPWORDS
 
 
 def parse_whatsapp_messages_with_years(text):
-    """Extract messages from WhatsApp conversation text with year information."""
+    """Extract messages from WhatsApp conversation text with year and date information."""
+    from datetime import datetime
+
     # WhatsApp format patterns (various formats)
     patterns = [
         r'\[(\d{1,2})/(\d{1,2})/(\d{2,4}),\s\d{1,2}:\d{2}(?::\d{2})?\s?(?:AM|PM)?\]\s*([^:]+):\s*(.+)',
@@ -17,13 +19,16 @@ def parse_whatsapp_messages_with_years(text):
     messages_by_year = defaultdict(list)
     all_messages = []
     speakers = defaultdict(int)
+    message_dates = []  # Store dates for timeline
 
     for line in text.split('\n'):
         for pattern in patterns:
             match = re.match(pattern, line.strip())
             if match:
                 groups = match.groups()
-                # Extract year - it could be 2-digit or 4-digit
+                # Extract date components
+                day = int(groups[0])
+                month = int(groups[1])
                 year_str = groups[2]
 
                 # Convert 2-digit year to 4-digit
@@ -43,17 +48,82 @@ def parse_whatsapp_messages_with_years(text):
                     'changed the subject', 'changed this group', 'left',
                     'added', 'removed', 'created group'
                 ]):
-                    messages_by_year[year].append(message)
-                    all_messages.append(message)
-                    speakers[speaker] += 1
+                    # Create date object
+                    try:
+                        date_obj = datetime(year, month, day)
+                        message_dates.append(date_obj)
+                        messages_by_year[year].append(message)
+                        all_messages.append(message)
+                        speakers[speaker] += 1
+                    except ValueError:
+                        # Skip invalid dates
+                        pass
                 break
 
-    return all_messages, messages_by_year, speakers
+    return all_messages, messages_by_year, speakers, message_dates
 
 
 def get_available_years(messages_by_year):
     """Get sorted list of years from the conversation."""
     return sorted(messages_by_year.keys(), reverse=True)
+
+
+def aggregate_messages_by_time(message_dates):
+    """Aggregate messages by week or month depending on conversation duration."""
+    from datetime import timedelta
+    from collections import Counter
+    import pandas as pd
+
+    if not message_dates:
+        return [], []
+
+    # Sort dates
+    sorted_dates = sorted(message_dates)
+
+    # Calculate conversation duration
+    duration = (sorted_dates[-1] - sorted_dates[0]).days
+
+    # Determine aggregation: weekly if < 365 days, monthly if >= 365 days
+    if duration < 365:
+        # Aggregate by week
+        # Get the Monday of each week (ISO week)
+        week_starts = [date - timedelta(days=date.weekday()) for date in sorted_dates]
+        date_counts = Counter(week_starts)
+
+        # Create complete timeline with zero counts for missing weeks
+        all_weeks = []
+        current = week_starts[0]
+        while current <= week_starts[-1]:
+            all_weeks.append(current)
+            current += timedelta(days=7)
+
+        dates = all_weeks
+        counts = [date_counts.get(date, 0) for date in all_weeks]
+
+    else:
+        # Aggregate by month
+        month_keys = [(date.year, date.month) for date in sorted_dates]
+        month_counts = Counter(month_keys)
+
+        # Create complete timeline with zero counts for missing months
+        start_year, start_month = month_keys[0]
+        end_year, end_month = month_keys[-1]
+
+        all_months = []
+        year, month = start_year, start_month
+        while (year, month) <= (end_year, end_month):
+            all_months.append((year, month))
+            month += 1
+            if month > 12:
+                month = 1
+                year += 1
+
+        # Convert to datetime for plotting
+        from datetime import datetime
+        dates = [datetime(year, month, 1) for year, month in all_months]
+        counts = [month_counts.get(month_key, 0) for month_key in all_months]
+
+    return dates, counts
 
 
 def get_font_path():
