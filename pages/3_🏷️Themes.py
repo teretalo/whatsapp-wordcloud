@@ -1,6 +1,7 @@
 """Themes Analysis Page - Topic Modeling"""
 import streamlit as st
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+import plotly.express as px
 import pandas as pd
 import json
 from datetime import datetime
@@ -15,7 +16,7 @@ st.markdown("Discover main topics and themes in your conversations using topic m
 if not st.session_state.get('chat_uploaded', False):
     st.warning("⚠️ No chat data loaded. Please upload a chat file on the Home page first.")
     if st.button("← Go to Home"):
-        st.switch_page("app.py")
+        st.switch_page("🏠 Home.py")
     st.stop()
 
 # Info box explaining topic modeling
@@ -124,8 +125,16 @@ if st.sidebar.button("🔍 Run Topic Analysis", type="primary", use_container_wi
                 # Get topic assignments for each message
                 topic_assignments = get_message_topics(message_texts, model, vectorizer)
 
+                # Generate meaningful topic names from top words
+                topic_names = {}
+                for idx, topic_words in enumerate(topics):
+                    # Use top 2-3 words as topic name
+                    top_words = [word for word, weight in topic_words[:3]]
+                    topic_names[idx] = " • ".join(top_words).title()
+
                 # Store results in session state
                 st.session_state.topics = topics
+                st.session_state.topic_names = topic_names
                 st.session_state.topic_assignments = topic_assignments
                 st.session_state.filtered_messages = filtered_messages
                 st.session_state.analysis_params = {
@@ -141,6 +150,7 @@ if st.sidebar.button("🔍 Run Topic Analysis", type="primary", use_container_wi
 # Display results if available
 if 'topics' in st.session_state and 'topic_assignments' in st.session_state:
     topics = st.session_state.topics
+    topic_names = st.session_state.get('topic_names', {})
     topic_assignments = st.session_state.topic_assignments
     filtered_messages = st.session_state.filtered_messages
     params = st.session_state.analysis_params
@@ -167,42 +177,58 @@ if 'topics' in st.session_state and 'topic_assignments' in st.session_state:
     # Topic Distribution Chart
     st.subheader("📊 Topic Distribution")
 
-    col1, col2 = st.columns([2, 1])
+    # Prepare data for bar chart
+    chart_data = []
+    for topic_idx in topic_counts.index:
+        count = topic_counts[topic_idx]
+        percentage = (count / total_messages) * 100
+        topic_name = topic_names.get(topic_idx, f"Topic {topic_idx}")
+        chart_data.append({
+            'topic': topic_name,
+            'count': count,
+            'percentage': percentage
+        })
 
-    with col1:
-        # Pie chart
-        fig, ax = plt.subplots(figsize=(10, 8))
-        colors = plt.cm.Set3(range(len(topic_counts)))
+    chart_df = pd.DataFrame(chart_data)
 
-        labels = [f"Topic {i}" for i in topic_counts.index]
-        sizes = topic_counts.values
+    # Create horizontal bar chart with Plotly
+    fig = go.Figure()
 
-        wedges, texts, autotexts = ax.pie(
-            sizes,
-            labels=labels,
-            autopct='%1.1f%%',
-            colors=colors,
-            startangle=90
-        )
+    fig.add_trace(go.Bar(
+        y=chart_df['topic'],
+        x=chart_df['count'],
+        orientation='h',
+        text=[f"{p:.1f}%" for p in chart_df['percentage']],
+        textposition='auto',
+        marker=dict(
+            color=chart_df['count'],
+            colorscale='Viridis',
+            showscale=False
+        ),
+        hovertemplate='<b>%{y}</b><br>Messages: %{x}<br>Percentage: %{text}<extra></extra>'
+    ))
 
-        for autotext in autotexts:
-            autotext.set_color('white')
-            autotext.set_fontweight('bold')
-            autotext.set_fontsize(10)
+    fig.update_layout(
+        title=dict(
+            text='Topic Distribution by Message Count',
+            font=dict(size=20, color='#1f2937')
+        ),
+        xaxis=dict(
+            title='Number of Messages',
+            showgrid=True,
+            gridcolor='rgba(0,0,0,0.05)'
+        ),
+        yaxis=dict(
+            title='',
+            autorange='reversed'
+        ),
+        plot_bgcolor='white',
+        paper_bgcolor='white',
+        height=max(400, len(chart_data) * 60),
+        margin=dict(l=20, r=40, t=80, b=60)
+    )
 
-        ax.set_title('Distribution of Topics')
-        st.pyplot(fig)
-        plt.close()
-
-    with col2:
-        st.markdown("### 📈 Topic Summary")
-        for topic_idx in topic_counts.index:
-            count = topic_counts[topic_idx]
-            percentage = (count / total_messages) * 100
-            st.markdown(f"""
-            **Topic {topic_idx}**
-            {percentage:.1f}% • {count:,} messages
-            """)
+    st.plotly_chart(fig, use_container_width=True)
 
     st.divider()
 
@@ -217,8 +243,9 @@ if 'topics' in st.session_state and 'topic_assignments' in st.session_state:
                 # Topic header
                 count = topic_counts.get(topic_idx, 0)
                 percentage = (count / total_messages) * 100 if total_messages > 0 else 0
+                topic_name = topic_names.get(topic_idx, f"Topic {topic_idx}")
 
-                st.markdown(f"### Topic {topic_idx}")
+                st.markdown(f"### {topic_name}")
 
                 # Top words
                 st.markdown("**Key Terms:**")
@@ -274,37 +301,58 @@ if 'topics' in st.session_state and 'topic_assignments' in st.session_state:
         topic_time_df = aggregate_topics_by_time(messages_with_topics, aggregation=aggregation)
 
         if not topic_time_df.empty:
-            # Plot
-            fig, ax = plt.subplots(figsize=(12, 6))
+            # Create Plotly line chart
+            fig = go.Figure()
 
             # Get topic columns (all except 'period')
             topic_cols = [col for col in topic_time_df.columns if col != 'period']
 
-            # Plot each topic
-            colors = plt.cm.Set3(range(len(topic_cols)))
+            # Color palette matching the bar chart
+            colors = px.colors.qualitative.Plotly
+
+            # Plot each topic with meaningful names
             for idx, topic_col in enumerate(topic_cols):
-                ax.plot(
-                    topic_time_df['period'],
-                    topic_time_df[topic_col],
-                    marker='o',
-                    label=f'Topic {topic_col}',
-                    linewidth=2,
-                    markersize=5,
-                    color=colors[idx]
+                topic_name = topic_names.get(topic_col, f"Topic {topic_col}")
+                fig.add_trace(go.Scatter(
+                    x=topic_time_df['period'],
+                    y=topic_time_df[topic_col],
+                    mode='lines+markers',
+                    name=topic_name,
+                    line=dict(width=2.5, color=colors[idx % len(colors)]),
+                    marker=dict(size=6),
+                    hovertemplate='<b>%{fullData.name}</b><br>%{x}<br>Messages: %{y}<extra></extra>'
+                ))
+
+            fig.update_layout(
+                title=dict(
+                    text=f'Topic Activity Over Time (by {aggregation})',
+                    font=dict(size=20, color='#1f2937')
+                ),
+                xaxis=dict(
+                    title=time_label,
+                    showgrid=True,
+                    gridcolor='rgba(0,0,0,0.05)'
+                ),
+                yaxis=dict(
+                    title='Number of Messages',
+                    showgrid=True,
+                    gridcolor='rgba(0,0,0,0.05)'
+                ),
+                plot_bgcolor='white',
+                paper_bgcolor='white',
+                hovermode='x unified',
+                height=500,
+                margin=dict(l=60, r=40, t=80, b=60),
+                legend=dict(
+                    orientation="v",
+                    yanchor="top",
+                    y=1,
+                    xanchor="left",
+                    x=1.02
                 )
+            )
 
-            ax.set_xlabel(time_label)
-            ax.set_ylabel('Message Count')
-            ax.set_title(f'Topic Activity Over Time (by {aggregation})')
-            ax.legend(loc='upper left')
-            ax.grid(True, alpha=0.3)
-
-            # Rotate x-axis labels for readability
-            plt.xticks(rotation=45, ha='right')
-            plt.tight_layout()
-
-            st.pyplot(fig)
-            plt.close()
+            st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("Not enough data points for time-based visualization.")
     else:
@@ -325,6 +373,7 @@ if 'topics' in st.session_state and 'topic_assignments' in st.session_state:
             'topics': [
                 {
                     'topic_id': idx,
+                    'topic_name': topic_names.get(idx, f"Topic {idx}"),
                     'top_words': [word for word, weight in topic_words[:10]],
                     'word_weights': {word: float(weight) for word, weight in topic_words[:10]},
                     'message_count': int(topic_counts.get(idx, 0)),
@@ -351,8 +400,9 @@ if 'topics' in st.session_state and 'topic_assignments' in st.session_state:
             count = topic_counts.get(idx, 0)
             percentage = (count / total_messages) * 100 if total_messages > 0 else 0
             top_words = ", ".join([word for word, weight in topic_words[:10]])
+            topic_name = topic_names.get(idx, f"Topic {idx}")
             csv_data.append({
-                'Topic': f'Topic {idx}',
+                'Topic': topic_name,
                 'Message Count': count,
                 'Percentage': f'{percentage:.1f}%',
                 'Top Words': top_words

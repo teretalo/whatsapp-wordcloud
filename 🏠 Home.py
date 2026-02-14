@@ -3,7 +3,7 @@ import streamlit as st
 import plotly.graph_objects as go
 from io import StringIO
 from collections import defaultdict
-from utils import parse_whatsapp_messages_with_years, get_available_years, create_wordcloud, aggregate_messages_by_time
+from utils import parse_whatsapp_messages_with_years, parse_whatsapp_messages_with_dates, get_available_years, create_wordcloud, aggregate_messages_by_time
 
 # Page config
 st.set_page_config(
@@ -24,6 +24,8 @@ if 'speakers' not in st.session_state:
     st.session_state.speakers = {}
 if 'message_dates' not in st.session_state:
     st.session_state.message_dates = []
+if 'messages_with_dates' not in st.session_state:
+    st.session_state.messages_with_dates = []
 if 'speaker_timeline_data' not in st.session_state:
     st.session_state.speaker_timeline_data = {}
 if 'speaker_message_types' not in st.session_state:
@@ -98,6 +100,9 @@ if uploaded_file is not None:
 
             all_messages, messages_by_year, speakers, message_dates, speaker_timeline_data, speaker_message_types, speaker_emojis, speaker_initiations, initiation_timeline_data = parse_whatsapp_messages_with_years(text_content)
 
+            # Also parse with dates for topic modeling
+            messages_with_dates, _, _, _ = parse_whatsapp_messages_with_dates(text_content)
+
             if all_messages:
                 # Create consistent color mapping for all speakers (alphabetically sorted)
                 color_palette = ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a',
@@ -112,6 +117,7 @@ if uploaded_file is not None:
                 st.session_state.messages_by_year = messages_by_year
                 st.session_state.speakers = speakers
                 st.session_state.message_dates = message_dates
+                st.session_state.messages_with_dates = messages_with_dates
                 st.session_state.speaker_timeline_data = speaker_timeline_data
                 st.session_state.speaker_message_types = speaker_message_types
                 st.session_state.speaker_emojis = speaker_emojis
