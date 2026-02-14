@@ -12,55 +12,73 @@ st.markdown("Explore the most frequently used words in your conversations.")
 if not st.session_state.get('chat_uploaded', False):
     st.warning("⚠️ No chat data loaded. Please upload a chat file on the Home page first.")
     if st.button("← Go to Home"):
-        st.switch_page("app.py")
+        st.switch_page("🏠 Home.py")
     st.stop()
 
 # Get data from session state
 all_messages = st.session_state.all_messages
 messages_by_year = st.session_state.messages_by_year
+speaker_timeline_data = st.session_state.speaker_timeline_data
 
-# Sidebar controls
-st.sidebar.header("🎨 Customization")
+st.divider()
 
-language = st.sidebar.selectbox(
-    "Language",
-    options=["English", "Italian", "Spanish"],
-    index=["English", "Italian", "Spanish"].index(st.session_state.language)
-)
-st.session_state.language = language
+# Filter controls in main content
+col1, col2, col3 = st.columns(3)
 
-available_years = get_available_years(messages_by_year)
-year_options = ["All"] + [str(year) for year in available_years]
-selected_year = st.sidebar.selectbox(
-    "Filter by Year",
-    options=year_options,
-    index=year_options.index(st.session_state.selected_year) if st.session_state.selected_year in year_options else 0
-)
-st.session_state.selected_year = selected_year
+with col1:
+    language = st.selectbox(
+        "Language",
+        options=["English", "Italian", "Spanish"],
+        index=["English", "Italian", "Spanish"].index(st.session_state.language)
+    )
+    st.session_state.language = language
 
-# Size options
-size_option = st.sidebar.radio(
-    "Cloud Size",
-    options=["Standard", "Large", "Extra Large"],
-    index=1
-)
+with col2:
+    available_years = get_available_years(messages_by_year)
+    year_options = ["All"] + [str(year) for year in available_years]
+    selected_year = st.selectbox(
+        "Filter by Year",
+        options=year_options,
+        index=0
+    )
 
-size_map = {
-    "Standard": (800, 400),
-    "Large": (1200, 600),
-    "Extra Large": (1600, 800)
-}
+with col3:
+    # Get all speakers
+    speakers = sorted(st.session_state.speakers.keys())
+    speaker_options = ["All"] + speakers
+    selected_speaker = st.selectbox(
+        "Filter by Speaker",
+        options=speaker_options,
+        index=0
+    )
 
-# Filter messages by year
-if selected_year == "All":
+st.divider()
+
+# Filter messages by year and speaker
+if selected_year == "All" and selected_speaker == "All":
+    # All messages
     messages_to_process = ' '.join(all_messages)
-    display_year = "all years"
+    display_filter = "all conversations"
     message_count = len(all_messages)
-else:
+elif selected_year == "All" and selected_speaker != "All":
+    # Filter by speaker only
+    speaker_messages = [msg for date, msg, wc in speaker_timeline_data[selected_speaker]]
+    messages_to_process = ' '.join(speaker_messages)
+    display_filter = f"{selected_speaker}'s messages"
+    message_count = len(speaker_messages)
+elif selected_year != "All" and selected_speaker == "All":
+    # Filter by year only
     year_int = int(selected_year)
     messages_to_process = ' '.join(messages_by_year[year_int])
-    display_year = selected_year
+    display_filter = f"year {selected_year}"
     message_count = len(messages_by_year[year_int])
+else:
+    # Filter by both year and speaker
+    year_int = int(selected_year)
+    speaker_messages = [msg for date, msg, wc in speaker_timeline_data[selected_speaker] if date.year == year_int]
+    messages_to_process = ' '.join(speaker_messages)
+    display_filter = f"{selected_speaker}'s messages in {selected_year}"
+    message_count = len(speaker_messages)
 
 # Generate and display wordcloud
 if messages_to_process.strip():
@@ -79,82 +97,32 @@ if messages_to_process.strip():
     st.divider()
 
     # Generate wordcloud
-    st.subheader(f"☁️ Word Cloud - {language} ({display_year})")
+    st.subheader(f"☁️ Word Cloud - {language}")
+    st.caption(f"Showing: {display_filter}")
 
     with st.spinner("Generating word cloud..."):
         wordcloud = create_wordcloud(messages_to_process, language)
         st.session_state.wordcloud_image = wordcloud
 
-        # Adjust figure size based on selected size
-        width, height = size_map[size_option]
-        figsize = (width/80, height/80)  # Convert pixels to inches (approx 80 dpi)
-
-        fig, ax = plt.subplots(figsize=figsize)
+        # Fixed size for consistency
+        fig, ax = plt.subplots(figsize=(15, 8))
         ax.imshow(wordcloud, interpolation='bilinear')
         ax.axis('off')
         st.pyplot(fig)
         plt.close()
 
+    st.caption("ℹ️ *Common words like articles, prepositions, and other filler words have been removed to highlight meaningful content.*")
+
     # Download button
     st.download_button(
         label="💾 Download Word Cloud",
         data=wordcloud.to_image().tobytes(),
-        file_name=f"wordcloud_{language}_{display_year}.png",
+        file_name=f"wordcloud_{language}_{display_filter.replace(' ', '_')}.png",
         mime="image/png",
         help="Download the word cloud as a PNG image"
     )
 
-    st.divider()
-
-    # Word frequency analysis
-    st.subheader("📊 Top Words Frequency")
-
-    # Get word frequencies from wordcloud
-    word_freq = wordcloud.words_
-
-    if word_freq:
-        # Show top 20 words
-        top_words = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)[:20]
-
-        col1, col2 = st.columns([2, 1])
-
-        with col1:
-            # Bar chart
-            words = [w[0] for w in top_words]
-            freqs = [w[1] for w in top_words]
-
-            fig, ax = plt.subplots(figsize=(10, 8))
-            bars = ax.barh(words, freqs, color='#2ecc71')
-            ax.set_xlabel('Relative Frequency')
-            ax.set_title('Top 20 Most Frequent Words')
-            ax.grid(axis='x', alpha=0.3)
-
-            # Add value labels
-            for bar in bars:
-                width = bar.get_width()
-                ax.text(width, bar.get_y() + bar.get_height()/2,
-                        f'{width:.3f}',
-                        ha='left', va='center', fontsize=9)
-
-            plt.tight_layout()
-            st.pyplot(fig)
-            plt.close()
-
-        with col2:
-            st.info("""
-            **About Word Frequencies**
-
-            The frequencies shown are relative scores that indicate how prominently each word appears in the cloud.
-
-            Common filler words (stopwords) are filtered out based on the selected language.
-
-            **Tips:**
-            - Try different years to see how word usage evolved
-            - Switch languages if your chat contains mixed languages
-            - Larger cloud sizes show more detail
-            """)
-
 else:
-    st.warning(f"No messages found for {display_year}")
+    st.warning(f"No messages found for {display_filter}")
     if st.button("← Go to Home"):
-        st.switch_page("app.py")
+        st.switch_page("🏠 Home.py")
