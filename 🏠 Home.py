@@ -1,4 +1,4 @@
-"""WhatsApp Conversation WordCloud - Home Page"""
+"""WhatsApp Conversation Analyzer - Home Page"""
 import streamlit as st
 import plotly.graph_objects as go
 from io import StringIO
@@ -6,7 +6,7 @@ from utils import parse_whatsapp_messages_with_years, get_available_years, creat
 
 # Page config
 st.set_page_config(
-    page_title="Home - WhatsApp WordCloud",
+    page_title="Home",
     page_icon="🏠",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -30,15 +30,11 @@ if 'selected_year' not in st.session_state:
 if 'wordcloud_image' not in st.session_state:
     st.session_state.wordcloud_image = None
 
-# Sidebar navigation
-st.sidebar.title("💬 Navigation")
-st.sidebar.info("Upload a WhatsApp chat to unlock all features")
-
 # Main content
-st.title("WhatsApp Conversation Analytics")
+st.title("WhatsApp Conversation Analyzer")
 st.markdown("""
-Welcome to WhatsApp WordCloud! Upload your WhatsApp chat export to explore insights about your conversations.
-Generate word clouds, analyze speaker activity, and discover conversation themes.
+Welcome to WhatsApp Analyzer! Upload your WhatsApp chat discover new insights about your conversations.
+Generate word clouds, analyze speaker activity, and find out what topics you talk about.
 """)
 
 # File uploader section
@@ -65,31 +61,6 @@ if uploaded_file is not None:
         else:
             st.error("Could not extract messages from the file. Please make sure it's a valid WhatsApp chat export.")
 
-# Configuration section (only show if chat is uploaded)
-if st.session_state.chat_uploaded:
-    st.header("⚙️ Configuration")
-    col1, col2 = st.columns(2)
-
-    with col1:
-        language = st.selectbox(
-            "Select Language",
-            options=["English", "Italian", "Spanish"],
-            index=["English", "Italian", "Spanish"].index(st.session_state.language),
-            key="language_selector"
-        )
-        st.session_state.language = language
-
-    with col2:
-        available_years = get_available_years(st.session_state.messages_by_year)
-        year_options = ["All"] + [str(year) for year in available_years]
-        selected_year = st.selectbox(
-            "Select Year",
-            options=year_options,
-            index=year_options.index(st.session_state.selected_year) if st.session_state.selected_year in year_options else 0,
-            key="year_selector"
-        )
-        st.session_state.selected_year = selected_year
-
 # Dashboard Overview
 if st.session_state.chat_uploaded:
     st.header("📊 Message Activity Timeline")
@@ -103,6 +74,12 @@ if st.session_state.chat_uploaded:
         duration = (sorted_dates[-1] - sorted_dates[0]).days
         aggregation_type = "Weekly" if duration < 365 else "Monthly"
 
+        # Set hover format based on aggregation type
+        if aggregation_type == "Weekly":
+            hover_format = '<b>Week of %{x|%B %d, %Y}</b><br>Messages: %{y}<extra></extra>'
+        else:
+            hover_format = '<b>%{x|%B %Y}</b><br>Messages: %{y}<extra></extra>'
+
         # Create interactive Plotly chart
         fig = go.Figure()
 
@@ -113,7 +90,7 @@ if st.session_state.chat_uploaded:
             fill='tozeroy',
             line=dict(color='#667eea', width=2.5),
             fillcolor='rgba(102, 126, 234, 0.2)',
-            hovertemplate='<b>%{x|%B %d, %Y}</b><br>Messages: %{y}<extra></extra>',
+            hovertemplate=hover_format,
             name='Messages'
         ))
 
