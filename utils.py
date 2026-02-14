@@ -2,7 +2,11 @@
 import re
 import os
 from collections import defaultdict
+from datetime import datetime
 from wordcloud import WordCloud, STOPWORDS
+import pandas as pd
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.decomposition import LatentDirichletAllocation
 
 
 def parse_whatsapp_messages_with_years(text):
@@ -287,3 +291,206 @@ def create_wordcloud(text, language):
     wordcloud = WordCloud(**wordcloud_kwargs).generate(text)
 
     return wordcloud
+
+
+def parse_whatsapp_messages_with_dates(text):
+    """Extract messages from WhatsApp conversation text with full datetime information."""
+    # WhatsApp format patterns (various formats)
+    patterns = [
+        # Pattern with brackets: [DD/MM/YYYY, HH:MM:SS AM/PM]
+        r'\[(\d{1,2})/(\d{1,2})/(\d{2,4}),\s(\d{1,2}):(\d{2})(?::(\d{2}))?\s?(AM|PM)?\]\s*([^:]+):\s*(.+)',
+        # Pattern with dash: DD/MM/YYYY, HH:MM:SS AM/PM - Speaker:
+        r'(\d{1,2})/(\d{1,2})/(\d{2,4}),\s(\d{1,2}):(\d{2})(?::(\d{2}))?\s?(AM|PM)?\s*-\s*([^:]+):\s*(.+)',
+        # Pattern without separator: DD/MM/YYYY, HH:MM:SS AM/PM Speaker:
+        r'(\d{1,2})/(\d{1,2})/(\d{2,4}),\s(\d{1,2}):(\d{2})(?::(\d{2}))?\s?(AM|PM)?\s*([^:]+):\s*(.+)'
+    ]
+
+    messages_with_dates = []
+    all_messages = []
+    messages_by_year = defaultdict(list)
+    speakers = defaultdict(int)
+
+    for line in text.split('\n'):
+        for pattern in patterns:
+            match = re.match(pattern, line.strip())
+            if match:
+                groups = match.groups()
+
+                # Extract date components
+                day = int(groups[0])
+                month = int(groups[1])
+                year_str = groups[2]
+                hour = int(groups[3])
+                minute = int(groups[4])
+                second = int(groups[5]) if groups[5] else 0
+                am_pm = groups[6]
+                speaker = groups[7].strip()
+                message = groups[8].strip()
+
+                # Convert 2-digit year to 4-digit
+                if len(year_str) == 2:
+                    year_int = int(year_str)
+                    year = 2000 + year_int if year_int <= 30 else 1900 + year_int
+                else:
+                    year = int(year_str)
+
+                # Convert to 24-hour format if AM/PM is present
+                if am_pm:
+                    if am_pm == 'PM' and hour != 12:
+                        hour += 12
+                    elif am_pm == 'AM' and hour == 12:
+                        hour = 0
+
+                # Create datetime object
+                try:
+                    msg_date = datetime(year, month, day, hour, minute, second)
+                except ValueError:
+                    # Skip invalid dates
+                    break
+
+                # Skip system messages
+                if not any(sys_msg in message.lower() for sys_msg in [
+                    'media omitted', 'missed voice call', 'missed video call',
+                    'changed the subject', 'changed this group', 'left',
+                    'added', 'removed', 'created group'
+                ]):
+                    messages_with_dates.append({
+                        'text': message,
+                        'date': msg_date,
+                        'speaker': speaker
+                    })
+                    all_messages.append(message)
+                    messages_by_year[year].append(message)
+                    speakers[speaker] += 1
+                break
+
+    return messages_with_dates, all_messages, messages_by_year, speakers
+
+
+def perform_topic_modeling(messages, num_topics=5, language='English'):
+    """
+    Perform topic modeling on messages using Latent Dirichlet Allocation (LDA).
+
+    Args:
+        messages: List of message texts
+        num_topics: Number of topics to discover
+        language: Language for stopwords
+
+    Returns:
+        topics: List of topics, each containing top words with weights
+        model: Trained LDA model
+        vectorizer: Fitted CountVectorizer
+    """
+    if not messages or len(messages) < num_topics:
+        return [], None, None
+
+    # Get language-specific stopwords
+    stopwords = get_stopwords_for_language(language)
+
+    # Convert to list for sklearn
+    stopwords_list = list(stopwords)
+
+    # Create document-term matrix
+    vectorizer = CountVectorizer(
+        max_features=1000,
+        min_df=2,
+        max_df=0.8,
+        stop_words=stopwords_list,
+        lowercase=True
+    )
+
+    try:
+        doc_term_matrix = vectorizer.fit_transform(messages)
+    except ValueError:
+        # Not enough valid terms
+        return [], None, None
+
+    # Perform LDA
+    lda_model = LatentDirichletAllocation(
+        n_components=num_topics,
+        max_iter=20,
+        learning_method='online',
+        random_state=42,
+        n_jobs=-1
+    )
+
+    lda_model.fit(doc_term_matrix)
+
+    # Extract topics with words and weights
+    feature_names = vectorizer.get_feature_names_out()
+    topics = []
+
+    for topic_idx, topic in enumerate(lda_model.components_):
+        # Get top 10 words for this topic
+        top_indices = topic.argsort()[-10:][::-1]
+        top_words = [(feature_names[i], topic[i]) for i in top_indices]
+        topics.append(top_words)
+
+    return topics, lda_model, vectorizer
+
+
+def get_message_topics(messages, model, vectorizer):
+    """
+    Assign each message to its dominant topic.
+
+    Args:
+        messages: List of message texts
+        model: Trained LDA model
+        vectorizer: Fitted CountVectorizer
+
+    Returns:
+        List of topic assignments (integers)
+    """
+    if model is None or vectorizer is None:
+        return []
+
+    # Transform messages
+    doc_term_matrix = vectorizer.transform(messages)
+
+    # Get topic distributions
+    topic_distributions = model.transform(doc_term_matrix)
+
+    # Assign each message to its dominant topic
+    topic_assignments = topic_distributions.argmax(axis=1)
+
+    return topic_assignments.tolist()
+
+
+def aggregate_topics_by_time(messages_with_topics, aggregation='day'):
+    """
+    Aggregate topic counts by time period.
+
+    Args:
+        messages_with_topics: List of dicts with 'date' and 'topic' keys
+        aggregation: 'day', 'fortnight', or 'month'
+
+    Returns:
+        DataFrame with date and topic count columns
+    """
+    if not messages_with_topics:
+        return pd.DataFrame()
+
+    # Create DataFrame
+    df = pd.DataFrame(messages_with_topics)
+
+    # Set date as index
+    df.set_index('date', inplace=True)
+
+    # Determine resampling frequency
+    if aggregation == 'day':
+        freq = 'D'
+    elif aggregation == 'fortnight':
+        freq = '2W'
+    elif aggregation == 'month':
+        freq = 'M'
+    else:
+        freq = 'D'
+
+    # Group by time period and topic, count messages
+    topic_counts = df.groupby([pd.Grouper(freq=freq), 'topic']).size().unstack(fill_value=0)
+
+    # Reset index to make date a column
+    topic_counts.reset_index(inplace=True)
+    topic_counts.rename(columns={'date': 'period'}, inplace=True)
+
+    return topic_counts

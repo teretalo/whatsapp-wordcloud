@@ -2,7 +2,11 @@
 import streamlit as st
 import plotly.graph_objects as go
 from io import StringIO
+<<<<<<< Updated upstream:Home.py
 from utils import parse_whatsapp_messages_with_years, get_available_years, create_wordcloud, aggregate_messages_by_time
+=======
+from utils import parse_whatsapp_messages_with_years, parse_whatsapp_messages_with_dates, get_available_years, create_wordcloud
+>>>>>>> Stashed changes:app.py
 
 # Page config
 st.set_page_config(
@@ -19,6 +23,8 @@ if 'all_messages' not in st.session_state:
     st.session_state.all_messages = []
 if 'messages_by_year' not in st.session_state:
     st.session_state.messages_by_year = {}
+if 'messages_with_dates' not in st.session_state:
+    st.session_state.messages_with_dates = []
 if 'speakers' not in st.session_state:
     st.session_state.speakers = {}
 if 'message_dates' not in st.session_state:
@@ -51,13 +57,19 @@ if uploaded_file is not None:
         stringio = StringIO(uploaded_file.getvalue().decode("utf-8"))
         text_content = stringio.read()
 
+<<<<<<< Updated upstream:Home.py
         all_messages, messages_by_year, speakers, message_dates = parse_whatsapp_messages_with_years(text_content)
+=======
+        # Parse with dates for topic modeling
+        messages_with_dates, all_messages, messages_by_year, speakers = parse_whatsapp_messages_with_dates(text_content)
+>>>>>>> Stashed changes:app.py
 
         if all_messages:
             # Store in session state
             st.session_state.chat_uploaded = True
             st.session_state.all_messages = all_messages
             st.session_state.messages_by_year = messages_by_year
+            st.session_state.messages_with_dates = messages_with_dates
             st.session_state.speakers = speakers
             st.session_state.message_dates = message_dates
 
