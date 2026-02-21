@@ -17,7 +17,7 @@ st.markdown("Fast dictionary-based emotion insights by speaker and over time.")
 if not st.session_state.get("chat_uploaded", False):
     st.warning("⚠️ No chat data loaded. Please upload a chat file on the Home page first.")
     if st.button("← Go to Home"):
-        st.switch_page("🏠 Home.py")
+        st.switch_page("app.py")
     st.stop()
 
 messages_with_dates = st.session_state.get("messages_with_dates", [])

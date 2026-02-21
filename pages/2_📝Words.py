@@ -12,7 +12,7 @@ st.markdown("Explore the most frequently used words in your conversations.")
 if not st.session_state.get('chat_uploaded', False):
     st.warning("⚠️ No chat data loaded. Please upload a chat file on the Home page first.")
     if st.button("← Go to Home"):
-        st.switch_page("🏠 Home.py")
+        st.switch_page("app.py")
     st.stop()
 
 # Get data from session state
@@ -125,4 +125,4 @@ if messages_to_process.strip():
 else:
     st.warning(f"No messages found for {display_filter}")
     if st.button("← Go to Home"):
-        st.switch_page("🏠 Home.py")
+        st.switch_page("app.py")

@@ -13,27 +13,54 @@ A Streamlit-based web application that analyzes WhatsApp chat exports to provide
 
 - **Frontend**: Streamlit 1.31.0
 - **Visualization**: Plotly 5.18.0, WordCloud 1.9.3, Matplotlib 3.8.2
-- **ML/NLP**: Transformers 4.30.0+, PyTorch 2.0.0+, scikit-learn 1.3.0+
+- **Analysis**: Dictionary-based emotion lexicons, scikit-learn 1.3.0+ (utility functions)
 - **Data Processing**: Pandas 2.0.0+
 
 ## Current Structure
 
 ```
 whatsapp-wordcloud/
-├── 🏠 Home.py              # Main entry point, file upload, timeline
+├── app.py                  # Main entry point (Cloud Run friendly), file upload, timeline
 ├── pages/
 │   ├── 1_👥 Who writes the most?.py    # Speaker analysis
 │   ├── 2_📝Words.py                     # Word analysis
 │   └── 4_😊 Sentiment.py               # Dictionary-based emotion analysis
 ├── utils.py                # Shared utilities and parsing functions
 ├── requirements.txt        # Python dependencies
+├── Dockerfile              # Cloud Run container build/runtime config
 └── .streamlit/
     └── config.toml        # Streamlit configuration
 ```
 
+## Deployment (Google Cloud Run)
+
+- **Platform**: Google Cloud Run
+- **Region**: `europe-north1`
+- **Service**: `streamlit-test`
+- **Domain**: `https://app.chartedpolitics.com`
+- **Entrypoint file**: `app.py` (renamed from `🏠 Home.py` for deployment-safe filename handling)
+  - Current sidebar label workaround in `app.py`: `__name__ = "🏠 Home"`
+- **Buildpacks outcome**: source deploy failed
+  - Current builder only supported Python 3.13/3.14
+  - Pillow attempted to compile and failed due to missing `zlib` system libs
+- **Working fix**: Docker-based deploy with `python:3.11-slim`
+  - Installs system libs required by Pillow/WordCloud (`zlib`, `jpeg/png/freetype`, `build-essential`)
+- **Runtime requirement (Cloud Run)**:
+  - Streamlit must bind to `$PORT` and `0.0.0.0`
+  - Container command:
+    - `streamlit run app.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true`
+- **Current deployment workflow**:
+  - Deploy from Cloud Console UI
+  - Reason: `gcloud run` commands in Cloud Shell crashed with a `TypeError` during deploy attempts, while container builds succeeded
+- **Required deployment files**:
+  - `app.py`
+  - `requirements.txt`
+  - `Dockerfile`
+  - `pages/`
+
 ## Feature Documentation
 
-### Home Page (🏠 Home.py)
+### Home Page (`app.py`)
 - **File Upload**: Accepts WhatsApp .txt exports
 - **Parsing**: Dual parsing system
   - `parse_whatsapp_messages_with_years()` - For main analysis with speaker timeline data
@@ -263,9 +290,11 @@ Consistent logic across Speakers and Emotion pages:
 
 ## Deployment Notes
 
-- Streamlit app runs on port 8501
+- Cloud Run deployment uses the Dockerfile and starts Streamlit on `$PORT` bound to `0.0.0.0`
+- Service: `streamlit-test` in `europe-north1`
+- Domain mapping: `https://app.chartedpolitics.com`
+- For local development, Streamlit default port is typically `8501`
 - No model download is required for dictionary-based emotion analysis
-- Recommended: 4GB+ RAM for smooth operation with large chats
 
 ---
 

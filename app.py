@@ -15,6 +15,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+st.title("🏠 Home")
+
+__name__ = "🏠 Home"
+
 # Initialize session state
 if 'chat_uploaded' not in st.session_state:
     st.session_state.chat_uploaded = False
