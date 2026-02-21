@@ -2,8 +2,10 @@
 import streamlit as st
 import matplotlib.pyplot as plt
 from utils import create_wordcloud, get_available_years
+from navigation import render_sidebar_navigation
 
 st.set_page_config(page_title="Word Analysis", page_icon="📝", layout="wide")
+render_sidebar_navigation()
 
 st.title("📝 Word Cloud Analysis")
 st.markdown("Explore the most frequently used words in your conversations.")

@@ -6,6 +6,7 @@ from io import StringIO
 from collections import defaultdict, Counter
 from datetime import datetime, timezone
 from utils import parse_whatsapp_messages_with_years, parse_whatsapp_messages_with_dates, get_available_years, create_wordcloud, aggregate_messages_by_time
+from navigation import render_sidebar_navigation
 
 # Page config
 st.set_page_config(
@@ -14,10 +15,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
-st.title("🏠 Home")
-
-__name__ = "🏠 Home"
+render_sidebar_navigation()
 
 # Initialize session state
 if 'chat_uploaded' not in st.session_state:

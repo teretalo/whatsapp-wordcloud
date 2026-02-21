@@ -3,8 +3,10 @@ import streamlit as st
 import plotly.graph_objects as go
 from collections import defaultdict, Counter
 from datetime import timedelta
+from navigation import render_sidebar_navigation
 
 st.set_page_config(page_title="Speakers Analysis", page_icon="👥", layout="wide")
+render_sidebar_navigation()
 
 st.title("👥 Who is writing the most?")
 st.markdown("Analyze each person's activity and contribution patterns in your WhatsApp conversations.")

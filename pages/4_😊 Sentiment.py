@@ -8,8 +8,10 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from utils import extract_emojis
+from navigation import render_sidebar_navigation
 
 st.set_page_config(page_title="Emotion Analysis", page_icon="😊", layout="wide")
+render_sidebar_navigation()
 
 st.title("😊 Emotion Analysis (Dictionary)")
 st.markdown("Fast dictionary-based emotion insights by speaker and over time.")
