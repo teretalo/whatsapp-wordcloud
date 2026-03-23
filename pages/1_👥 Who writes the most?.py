@@ -3,8 +3,10 @@ import streamlit as st
 import plotly.graph_objects as go
 from collections import defaultdict, Counter
 from datetime import timedelta
+from navigation import render_sidebar_navigation
 
 st.set_page_config(page_title="Speakers Analysis", page_icon="👥", layout="wide")
+render_sidebar_navigation()
 
 st.title("👥 Who is writing the most?")
 st.markdown("Analyze each person's activity and contribution patterns in your WhatsApp conversations.")
@@ -13,7 +15,7 @@ st.markdown("Analyze each person's activity and contribution patterns in your Wh
 if not st.session_state.get('chat_uploaded', False):
     st.warning("⚠️ No chat data loaded. Please upload a chat file on the Home page first.")
     if st.button("← Go to Home"):
-        st.switch_page("🏠 Home.py")
+        st.switch_page("app.py")
     st.stop()
 
 # Get data from session state
@@ -532,4 +534,4 @@ if speakers and speaker_timeline_data:
 else:
     st.info("No speaker data available. Upload a chat file that includes speaker names.")
     if st.button("← Go to Home"):
-        st.switch_page("🏠 Home.py")
+        st.switch_page("app.py")
