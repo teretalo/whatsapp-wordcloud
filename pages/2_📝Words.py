@@ -2,8 +2,10 @@
 import streamlit as st
 import matplotlib.pyplot as plt
 from utils import create_wordcloud, get_available_years
+from navigation import render_sidebar_navigation
 
 st.set_page_config(page_title="Word Analysis", page_icon="📝", layout="wide")
+render_sidebar_navigation()
 
 st.title("📝 Word Cloud Analysis")
 st.markdown("Explore the most frequently used words in your conversations.")
@@ -12,7 +14,7 @@ st.markdown("Explore the most frequently used words in your conversations.")
 if not st.session_state.get('chat_uploaded', False):
     st.warning("⚠️ No chat data loaded. Please upload a chat file on the Home page first.")
     if st.button("← Go to Home"):
-        st.switch_page("🏠 Home.py")
+        st.switch_page("app.py")
     st.stop()
 
 # Get data from session state
@@ -125,4 +127,4 @@ if messages_to_process.strip():
 else:
     st.warning(f"No messages found for {display_filter}")
     if st.button("← Go to Home"):
-        st.switch_page("🏠 Home.py")
+        st.switch_page("app.py")
